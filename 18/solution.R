@@ -242,3 +242,4 @@ for(n in 1:nrow(try_add_dataframe)){
 }
 try_add_dataframe_backup = try_add_dataframe
 try_add_dataframe = try_add_dataframe_backup
+max(try_add_dataframe$magnitudes) #4770
