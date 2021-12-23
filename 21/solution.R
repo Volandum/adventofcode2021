@@ -153,3 +153,4 @@ options %>% filter(score1 >= 21 | score2 >= 21) %>% group_by(player) %>%
 options(digits=20)
 
 #Performance is atrocious (but not bad enough to be infeasible) - much better to have an array and go forwards in the loop rather than go backwards
+# Even better strategy - joins!!
