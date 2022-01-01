@@ -69,10 +69,13 @@ get_legal_moves = function(position){
   acceptor_rooms = current_room_positions %>% filter(accepting) %>% 
     transmute(target_room = position, 
               extra_final_move = ifelse(is.na(first), 1, 0))
+  
+  
 
   any_rooms_accepting = any(current_room_positions$accepting)
   any_rooms_emitting = !all(current_room_positions$accepting)
   
+
   if(length(occupied_corridor_positions) == 0 | !any_rooms_accepting){
     corridor_to_room_moves = data.frame()
   } else {
@@ -90,6 +93,10 @@ get_legal_moves = function(position){
       corridor_to_room_moves = data.frame()
     }
   }
+  
+  # if(nrow(corridor_to_room_moves) > 0){
+  #   return(corridor_to_room_moves[1,])
+  # }
   
   if(any_rooms_accepting & any_rooms_emitting){
     pre_filter = current_room_positions %>% 
@@ -112,6 +119,10 @@ get_legal_moves = function(position){
   } else {
     room_to_room_moves = data.frame()
   }
+  
+  # if(nrow(room_to_room_moves) > 0){
+  #   return(room_to_room_moves[1,])
+  # }
   
   if(any_rooms_emitting){
     pre_filter = current_room_positions %>% 
@@ -195,7 +206,8 @@ get_move_cost = function(move){
   amphipod_cost_mapping[move$amphipod]*move$distance
 }
 
-games_from_point = function(position){
+games_from_point = function(position, depth){
+  message(paste0('depth at ', depth))
   if(is_complete(position)){
     return(TRUE)
   }
@@ -211,7 +223,7 @@ games_from_point = function(position){
   games_as_df = lapply(1:nrow(legal_moves), function(index){
     #gets lists of moves for subsequent positions
     new_position = new_positions[[index]]
-    subsequent_games = games_from_point(new_position)
+    subsequent_games = games_from_point(new_position, depth + 1)
     if(!is.list(subsequent_games)){
       if(subsequent_games){
         has_ways_to_go = TRUE
@@ -232,4 +244,102 @@ games_from_point = function(position){
   return(list_of_games)
 }
 
-x = games_from_point(starting_position_test)
+x = games_from_point(starting_position_test, 0)
+
+
+encode_position_as_string = function(position){
+  rbind(position$corridor %>% 
+          transmute(position, string = ifelse(is.na(contents), '.', contents)),
+        position$rooms %>% 
+          mutate(first_with_dots = ifelse(is.na(first), '.', first),
+                 second_with_dots = ifelse(is.na(second), '.', second)) %>%
+          transmute(position, string = paste0(first_with_dots, second_with_dots))) %>%
+    arrange(position) %>% pull(string) %>%
+    paste0(collapse = '') %>%
+    paste0('P',.)
+  }
+
+positions_to_check = data.frame(position = character(0), min_cost = numeric(0))
+positions_env = new.env()
+finished = FALSE
+# positions here will be a named list with:
+# Position as the position
+# Cost as the lowest observed cost
+# Moves as a set of moves realising the lowest observed cost
+
+add_position = function(position, cost, moves){
+  position_string = encode_position_as_string(position)
+  if(position_string %in% positions_to_check$position){
+    old_cost = positions_to_check[position == position_string,"min_cost"]
+    if(old_cost > cost){
+      positions_to_check[position == position_string,"min_cost"] = cost
+    }
+  }
+  if(position_string %in% names(positions_env)){
+    if(positions_env[[position_string]]$cost > cost){
+      positions_env[[position_string]]$cost = cost
+      positions_env[[position_string]]$moves = moves
+    }
+  } else {
+    positions_env[[position_string]] = list(
+      position = position,
+      cost = cost,
+      moves = moves
+    )
+    positions_to_check <<- rbind(positions_to_check,
+                               data.frame(position = position_string,
+                                          min_cost = cost))
+  }
+}
+
+add_position(starting_position_test, 0, data.frame())
+
+while(!finished){
+  cheapest_position_to_check = positions_to_check %>% 
+    arrange(min_cost) %>% head(1) %>% pull(position)
+  actual_position = positions_env[[cheapest_position_to_check]]$position
+  if(is_complete(position)){
+    finished = TRUE
+    break()
+  }
+  moves_to_position = positions_env[[cheapest_position_to_check]]$moves
+  cost_to_position = positions_env[[cheapest_position_to_check]]$cost
+  
+  moves_from_position = get_legal_moves(actual_position)
+  if(nrow(moves_from_position) > 0){
+    
+  }
+}
+
+# #############
+# #01.3.5.7.9X#
+# ###2#4#6#8###
+# #.#.#.#.#
+# #########
+# 
+# 6-X (5B)
+# 6-9 (5B)
+# 6-0 (9A)
+# 6-1 (9B)
+# 4-6 (7C)
+# 4-6 (7C)
+# 4-7 (6B)
+# 4-3 (5D)
+# 7-4 (7B)
+# 9-4 (8B)
+# X-4 (8B)
+# 8-X (3A)
+# 8-9 (3A)
+# 8-6 (7C)
+# 8-6 (7C)
+# 3-8 (9D)
+# 1-4 (4B)
+# 2-1 (2A)
+# 2-8 (11D)
+# 2-8 (11D)
+# 2-8 (11D)
+# 1-2 (5A)
+# 0-2 (5A)
+# 9-2 (9A)
+# X-2 (9A)
+
